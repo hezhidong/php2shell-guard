@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-10-23
+
+Added.
+
+- **Bilingual UI (English / 中文) with automatic OS-locale detection.** Language
+  resolution order: `--lang en|zh` / `PHP2SHELL_LANG` > `LC_ALL`/`LC_MESSAGES`/`LANG`
+  > Windows user locale > English fallback.
+- Every human-facing string (scan report, verify conclusions, `fix` messages, wizard,
+  `--help`) goes through the translation table; reports and the wizard now render in the
+  resolved language.
+- JSON output: added top-level `language` field and a language-neutral `detail_key` per
+  install so automation is unaffected by display language.
+- Status keywords remain stable English tokens (`VULNERABLE`, `EOL-VULNERABLE`, `FIXED`,
+  `ACTIVE` / `NOT ACTIVE`) for grep/CI regardless of UI language.
+
 ## [1.1.0] - 2026-10-23
 
 Added.
@@ -34,5 +49,6 @@ Initial release.
 - `verify` — re-check versions and confirm live mitigation values after worker restarts.
 - Built-in 14-case self-test for the version decision matrix.
 
+[1.2.0]: https://github.com/hezhidong/php2shell-guard/releases/tag/v1.2.0
 [1.1.0]: https://github.com/hezhidong/php2shell-guard/releases/tag/v1.1.0
 [1.0.0]: https://github.com/hezhidong/php2shell-guard/releases/tag/v1.0.0

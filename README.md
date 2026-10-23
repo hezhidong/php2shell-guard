@@ -50,6 +50,25 @@ The whole session is written to a timestamped log
 screen prints its full path. In a non-interactive context (pipes/CI) the wizard
 exits with guidance — use the subcommands below instead.
 
+### Output language (English / 中文)
+
+Human-facing output is bilingual and selected automatically:
+
+1. `--lang en` or `--lang zh` on any command (highest priority), or the
+   `PHP2SHELL_LANG=en|zh` environment variable;
+2. otherwise the POSIX `LC_ALL` / `LC_MESSAGES` / `LANG` locale;
+3. on Windows without those variables, the user's system locale (`GetUserDefaultLocaleName`);
+4. fallback is English.
+
+Status keywords in reports stay stable and English (`VULNERABLE`, `EOL-VULNERABLE`,
+`FIXED`, `ACTIVE`) for grepping; JSON output adds a language-neutral
+`detail_key` per install plus a top-level `language` field. Example:
+
+```bash
+python3 php2shell_guard.py --lang zh scan     # force Chinese
+PHP2SHELL_LANG=en python3 php2shell_guard.py  # force English for this shell
+```
+
 ### Subcommands (scripts / automation)
 
 ```bash

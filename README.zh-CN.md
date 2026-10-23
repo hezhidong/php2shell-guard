@@ -36,6 +36,24 @@ python3 php2shell_guard.py
 （`php2shell-guard-YYYYmmdd-HHMMSS.log`），结束时显示完整路径，可事后查看全过程。
 非交互式环境（管道/CI）运行向导会直接给出提示并退出，自动化请使用下面的子命令。
 
+### 输出语言（中文 / English）
+
+面向用户的输出内置中英双语，按以下优先级自动选择：
+
+1. 任意命令加 `--lang en` 或 `--lang zh`（最高优先级），或环境变量
+   `PHP2SHELL_LANG=en|zh`；
+2. 否则看 POSIX 区域变量 `LC_ALL` / `LC_MESSAGES` / `LANG`；
+3. Windows 上没有上述变量时，跟随系统区域设置（`GetUserDefaultLocaleName`）；
+4. 都无法判断时回退英文。
+
+报告中的状态词保持英文稳定不变（`VULNERABLE`、`EOL-VULNERABLE`、`FIXED`、`ACTIVE`），
+方便检索；JSON 顶层增加 `language` 字段、每个安装项增加语言无关的 `detail_key`。示例：
+
+```bash
+python3 php2shell_guard.py --lang en scan   # 强制英文
+PHP2SHELL_LANG=zh python3 php2shell_guard.py # 为本终端强制中文
+```
+
 ### 子命令（脚本 / 自动化）
 
 ```bash
