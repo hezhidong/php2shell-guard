@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0] - 2026-10-23
+
+Added.
+
+- **Interactive three-step wizard** — running the program with no arguments (or `wizard`)
+  now launches a guided flow: (1) detect vulnerable PHP installs, (2) choose and apply a
+  fix (package-manager upgrade or temporary ini mitigations, with confirmation prompts),
+  (3) re-verify and report whether the vulnerability is fully closed or only mitigated.
+- The wizard writes a full timestamped log (`php2shell-guard-YYYYmmdd-HHMMSS.log`) in the
+  working directory and prints its path at the end.
+- `--version` flag.
+- Non-interactive invocations (pipes, CI) of the wizard exit with guidance instead of
+  hanging on prompts; the `scan` / `fix` / `verify` subcommands remain unchanged for
+  automation.
+
 ## [1.0.0] - 2026-10-22
 
 Initial release.
@@ -19,4 +34,5 @@ Initial release.
 - `verify` — re-check versions and confirm live mitigation values after worker restarts.
 - Built-in 14-case self-test for the version decision matrix.
 
+[1.1.0]: https://github.com/hezhidong/php2shell-guard/releases/tag/v1.1.0
 [1.0.0]: https://github.com/hezhidong/php2shell-guard/releases/tag/v1.0.0

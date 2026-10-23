@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 
 CVE1 = "CVE-2026-109618"  # OOM corruption -> RCE
 CVE2 = "CVE-2026-109619"  # stale global state -> RCE
+VERSION = "1.1.0"
 
 # 各分支首个修复版本
 FIXED = {
@@ -552,6 +553,196 @@ def cmd_fix(args):
     return 0
 
 
+# ---------------------------------------------------------------- 交互向导
+
+class _Tee:
+    """同时输出到屏幕和日志文件。"""
+    def __init__(self, log_path):
+        self.term = sys.stdout
+        self.log = open(log_path, "w", encoding="utf-8")
+    def write(self, s):
+        self.term.write(s)
+        self.log.write(s)
+    def flush(self):
+        self.term.flush()
+        self.log.flush()
+    def close(self):
+        try:
+            self.log.close()
+        except Exception:
+            pass
+
+
+def _ask(prompt, choices=None, default=None):
+    while True:
+        ans = input(prompt).strip().lower()
+        if not ans and default is not None:
+            return default
+        if not choices or ans in choices:
+            return ans
+        print("  请输入: %s" % " / ".join(choices))
+
+
+def _vuln_installs(r):
+    return [i for i in r["installs"]
+            if i["status"] in ("vulnerable", "eol-vulnerable")]
+
+
+def _phase_banner(n, title):
+    print("\n" + "=" * 68)
+    print("  步骤 %d/3  %s" % (n, title))
+    print("=" * 68)
+
+
+def wizard():
+    if not sys.stdin.isatty():
+        print("当前不是交互式终端。请直接运行不带参数的命令进入向导，")
+        print("或在脚本/自动化中使用: scan / fix --apply|--harden-only / verify")
+        return 1
+    return _wizard_run()
+
+
+def _wizard_run():
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_path = os.path.abspath("php2shell-guard-%s.log" % stamp)
+    tee = _Tee(log_path)
+    old_out = sys.stdout
+    sys.stdout = tee
+    code = 0
+    try:
+        print("#" * 68)
+        print("#  PHP2Shell 修复向导  (v%s)" % VERSION)
+        print("#  CVE-2026-109618 (OOM 损坏 RCE) / CVE-2026-109619 (过期状态 RCE)")
+        print("#  全程只读检查；只有你在步骤 2 明确确认后才会改动系统。")
+        print("#  开始时间: %s" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("#" * 68)
+
+        # ---------------- 步骤 1: 检测 ----------------
+        _phase_banner(1, "检查本机 PHP 是否存在漏洞")
+        r = do_scan()
+        print_report(r)
+
+        if not r["installs"]:
+            print("\n本机未安装 PHP, 无需修复。")
+            if r["docker_php_containers"]:
+                print("但检测到 Docker 中的 PHP 容器, 需在镜像层面处理 (见 README)。")
+            print("\n完整执行过程已写入日志:\n  %s" % log_path)
+            return 0
+
+        vuln = _vuln_installs(r)
+        if not vuln:
+            print("\n所有 PHP 安装均已含补丁, 无需操作。")
+            print("\n完整执行过程已写入日志:\n  %s" % log_path)
+            return 0
+
+        print("\n发现 %d 个受影响的 PHP 安装。" % len(vuln))
+
+        # ---------------- 步骤 2: 修复 ----------------
+        while True:
+            _phase_banner(2, "修复漏洞")
+            label, plan, auto = upgrade_plan()
+            print("请选择修复方式:")
+            if auto:
+                print("  [1] 立即升级到官方修复版本 (推荐, 唯一彻底修复)")
+                print("      本机将通过 %s 执行: %s" % (label, " ".join(plan)))
+                print("  [2] 暂时无法升级 —— 先写入临时缓解配置 (降低风险, 不等于修复)")
+            else:
+                print("  [1] 立即升级 (本机无法自动执行: %s)" % label)
+                print("      需手动下载安装: https://windows.php.net/download/")
+                print("  [2] 暂时无法升级 —— 先写入临时缓解配置")
+            print("  [q] 退出向导 (不做任何改动)")
+            choice = _ask("你的选择 [1]: ", choices=("1", "2", "q"), default="1")
+
+            if choice == "q":
+                print("已退出, 未做任何改动。")
+                print("\n日志文件:\n  %s" % log_path)
+                return 1
+
+            if choice == "1":
+                if not auto:
+                    print("\n请手动升级到 8.2.35+ / 8.3.36+ / 8.4.27+ / 8.5.12+ 后重新运行本向导。")
+                    print("\n日志文件:\n  %s" % log_path)
+                    return 1
+                print("\n即将以系统包管理器升级 PHP, 过程中可能要求输入 sudo 密码。")
+                if _ask("确认执行升级? [y/N]: ", choices=("y", "n", ""), default="n") != "y":
+                    print("已取消升级, 返回选择。")
+                    continue
+                if label == "debian-apt":
+                    cmds = [["sudo", "apt-get", "update"],
+                            ["sudo", "apt-get", "install", "--only-upgrade", "-y",
+                             "php-cli", "php-fpm", "libapache2-mod-php", "php-cgi"]]
+                else:
+                    cmds = [plan]
+                failed = False
+                for c in cmds:
+                    print("\n$ %s" % " ".join(c))
+                    if subprocess.run(c).returncode != 0:
+                        print("命令执行失败。可改用选项 [2] 临时缓解, 修复包管理器后再升级。")
+                        failed = True
+                        break
+                if failed:
+                    if _ask("\n是否改用临时缓解? [y/N]: ",
+                            choices=("y", "n", ""), default="n") != "y":
+                        print("\n日志文件:\n  %s" % log_path)
+                        return 1
+                    choice = "2"
+                else:
+                    print("\n升级命令已完成。")
+                    print("重要: 必须重启 Web 服务/php-fpm worker, 旧进程仍加载着有漏洞的代码:")
+                    print("  Apache(Debian): sudo systemctl restart apache2")
+                    print("  php-fpm:        sudo systemctl restart php*-fpm")
+                    print("  httpd(RHEL):    sudo systemctl restart httpd php-fpm")
+                    input("\n重启完成后按回车继续复检 …")
+                    break
+
+            if choice == "2":
+                print("\n将为每个受影响安装写入:")
+                print("  memory_limit = -1")
+                print("  session.upload_progress.enabled = 0")
+                print("  fatal_error_backtraces = 0   (PHP 8.5)")
+                print("优先写入 scan 目录的 99-php2shell-mitigations.ini;")
+                print("无 scan 目录时备份 php.ini 后幂等追加。")
+                if _ask("确认写入临时缓解? [y/N]: ",
+                        choices=("y", "n", ""), default="n") != "y":
+                    print("已取消, 返回选择。")
+                    continue
+                for i in vuln:
+                    path, _, where = harden(i["path"], apply_write=True)
+                    print("  %s -> %s" % (i["path"], path or ("未能定位 ini: " + str(where))))
+                print("\n缓解配置已写入。请重启 Web 服务/php-fpm 后再复检:")
+                print("  sudo systemctl restart apache2  /  php*-fpm  /  httpd")
+                input("\n重启完成后按回车继续复检 …")
+                break
+
+        # ---------------- 步骤 3: 复检 ----------------
+        _phase_banner(3, "再次检查漏洞是否仍然存在")
+        r2 = do_scan()
+        print_report(r2)
+        vuln2 = _vuln_installs(r2)
+
+        print("\n" + "-" * 68)
+        if not vuln2:
+            print("  结果: 漏洞已修补完成。所有 PHP 安装均已达到修复版本。")
+            code = 0
+        else:
+            hardened_ok = all(all(i.get("hardening", {}).values()) for i in vuln2)
+            if hardened_ok:
+                print("  结果: 版本仍低于修复版, 但临时缓解已全部生效。")
+                print("  当前风险已降低; 请尽快安排升级完成彻底修复。")
+            else:
+                print("  结果: 仍有 %d 个安装受影响且缓解未完全生效, 请检查上方输出。"
+                      % len(vuln2))
+            code = 2
+
+        print("\n本次完整执行过程 (含每一步的检测结果与操作) 已写入日志:")
+        print("  %s" % log_path)
+        print("-" * 68)
+        return code
+    finally:
+        sys.stdout = old_out
+        tee.close()
+
+
 # ---------------------------------------------------------------- 自测
 
 def self_test():
@@ -593,7 +784,9 @@ def main():
     ap = argparse.ArgumentParser(
         description="PHP2Shell (CVE-2026-109618/109619) 检测-修复-复检工具")
     ap.add_argument("--self-test", action="store_true", help="运行内置判定自测")
+    ap.add_argument("--version", action="version", version="php2shell-guard " + VERSION)
     sub = ap.add_subparsers(dest="cmd")
+    p_wiz = sub.add_parser("wizard", help="交互式三步向导 (不带任何参数启动时默认进入)")
     p_scan = sub.add_parser("scan", help="只读检测")
     p_scan.add_argument("--json", action="store_true", help="输出 JSON")
     p_ver = sub.add_parser("verify", help="修复后复检")
@@ -606,6 +799,8 @@ def main():
 
     if args.self_test:
         sys.exit(self_test())
+    if args.cmd in (None, "wizard"):
+        sys.exit(wizard())
     if args.cmd == "scan":
         sys.exit(cmd_scan(args))
     if args.cmd == "verify":

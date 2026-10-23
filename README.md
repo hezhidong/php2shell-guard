@@ -30,6 +30,28 @@ supported branch is the only fix.
 
 ## Quick start
 
+### Interactive three-step wizard (recommended)
+
+Just run it with no arguments and follow the prompts — no flags to remember:
+
+```bash
+python3 php2shell_guard.py
+```
+
+1. **Detect** — scans every local PHP install and shows which are exposed.
+2. **Fix** — you choose: upgrade via the system package manager (recommended), or
+   apply the temporary ini mitigations if you cannot upgrade yet; nothing changes
+   until you confirm.
+3. **Verify** — re-scans and tells you plainly whether the vulnerability is closed
+   or only mitigated.
+
+The whole session is written to a timestamped log
+(`php2shell-guard-YYYYmmdd-HHMMSS.log`) in the working directory, and the final
+screen prints its full path. In a non-interactive context (pipes/CI) the wizard
+exits with guidance — use the subcommands below instead.
+
+### Subcommands (scripts / automation)
+
 ```bash
 # 1. Detect (read-only — always run this first)
 python3 php2shell_guard.py scan
