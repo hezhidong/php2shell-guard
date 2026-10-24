@@ -10,8 +10,14 @@ unauthenticated Remote Code Execution vulnerabilities in PHP itself:
 - **CVE-2026-109619** — RCE via stale global state reused by a later request on
   the same worker (the default-enabled `session.upload_progress` is one confirmed path).
 
-Both score **CVSS v4.0 9.2 (Critical)** and are already being exploited in the
-wild. Vulnerable: every version before **8.5.12 / 8.4.27 / 8.3.36 / 8.2.35**.
+Both are rated **CVSS v4.0 9.2 (Critical)** by the PHP security team
+(GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp) and are already being exploited
+in the wild. NVD independently reassesses them under **CVSS v3.1** at
+**9.8 (CVE-2026-109618)** and **8.1 High (CVE-2026-109619)** — the gap comes
+from different attack-complexity assumptions (the vendor rates AC:H, NVD rates
+109618 AC:L), not from conflicting facts. Either scale demands immediate
+upgrade. Vulnerable: every version before
+**8.5.12 / 8.4.27 / 8.3.36 / 8.2.35**.
 PHP 8.1 and older (back to 5.x) have no patches on the branch — upgrading to a
 supported branch is the only fix.
 

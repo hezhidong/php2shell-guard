@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Documentation.
+
+- README (en/zh) now cites both scoring scales for the two CVEs: the PHP security
+  team's **CVSS v4.0 9.2** (GHSA vector strings) and NVD's independent **CVSS v3.1**
+  reassessments (9.8 for CVE-2026-109618, 8.1 for CVE-2026-109619), noting the gap
+  comes from differing attack-complexity assumptions (AC:H vs AC:L).
+
 ## [1.2.0] - 2026-10-23
 
 Added.
